@@ -2,10 +2,12 @@ package org.agora.jac;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 
+import org.agora.jac.saa.SAAArgument;
 import org.agora.jac.saa.SAAGraph;
 
 
@@ -76,6 +78,34 @@ public class JAgoraComputation {
     return false;
 	}
 	
+	
+	public boolean updateDatabase() {
+	  try {
+	    c.setAutoCommit(false);
+	    
+	    PreparedStatement s = c.prepareStatement("UPDATE arguments SET acceptability=? WHERE arg_ID=? AND source_ID=?;");
+	    
+	    for (SAAArgument a : graph.getArguments()) {
+	      s.setDouble(1, a.getValuation());
+	      s.setInt(2, a.getID());
+	      s.setString(3, a.getSource());
+	      s.addBatch();
+	    }
+	     
+	    s.executeBatch();
+	    
+	    c.commit();
+	    c.setAutoCommit(true);
+	    c.close();
+	    return true;
+	  } catch (SQLException e){
+	    System.err.println("JAgoraComputation: problem storing outcomes.");
+      System.err.println(e.getMessage());
+      e.printStackTrace();
+	  }
+	  return false;
+	}
+	
 	public void computeOutcomes() {
 	  graph.computeOutcomes();
 	}
@@ -91,12 +121,17 @@ public class JAgoraComputation {
 		if (!jac.initiateConnection("jdbc:mysql://192.168.8.200:3306/agora-db", "agora-dev", "pythagoras"))
 		  return;
 		if (!jac.loadDataFromDB()) return;
-		if (!jac.terminateConnection()) return;
 		jac.printGraph();
 		System.out.print("Starting computation... ");
 		jac.computeOutcomes();
 		System.out.println("done!");
+		System.out.print("Updating database... ");
+		if(jac.updateDatabase())
+		  System.out.println("done!");
+		else
+		  System.out.println("failed!");
 		System.out.println();
+		if (!jac.terminateConnection()) return;
 		jac.printGraph();
 	}
 }

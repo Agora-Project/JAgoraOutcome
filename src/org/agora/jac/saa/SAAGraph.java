@@ -15,7 +15,7 @@ public class SAAGraph {
   
   protected Map<String, SAAAttack> attackMap;
   
-  protected double MAX_FIXPOINT_ERROR = 0.01; 
+  protected double MAX_FIXPOINT_ERROR = 0.001; 
   
   public void computeOutcomes(){
     double change = Double.MAX_VALUE;
@@ -24,9 +24,8 @@ public class SAAGraph {
       for (SAAArgument a : arguments) {
         double oldValuation = a.getValuation();
         a.updateValuation();
-        change += Math.abs(oldValuation - a.getValuation());
+        change = Math.max(change, Math.abs(oldValuation - a.getValuation()));
       }
-      System.out.println(change);
     }
   }
   
@@ -93,6 +92,7 @@ public class SAAGraph {
     }
   }
   
+  public SAAArgument[] getArguments() { return arguments; }
   
   public void printGraph() {
     for (SAAArgument a : arguments) {
