@@ -30,7 +30,7 @@ public class SAAArgument{
   }
   
   public static String makeGlobalID(String source, int localID) {
-    return source + Integer.toHexString(localID);
+    return source + "(" +Integer.toHexString(localID) +")";
   }
   
   /**
@@ -48,14 +48,15 @@ public class SAAArgument{
   }
   
   public void calculateCrowdSupport() {
+    // Assumes attackers have been parsed.
     if (positiveVotes + negativeVotes == 0)
       crowdSupport = 0.5;
     else
-      crowdSupport = 1.0*positiveVotes / (positiveVotes + negativeVotes);
+      crowdSupport = (1.0*positiveVotes / (positiveVotes + negativeVotes)) / (attackers.size()+1);
   }
   
-  public void iterateValuation() {
-    valuation = crowdSupport * (1 - calculateAggregatedAttack());
+  public void updateValuation() {
+    valuation = crowdSupport * calculateAggregatedAttack();
   }
   
   protected double calculateAggregatedAttack() {

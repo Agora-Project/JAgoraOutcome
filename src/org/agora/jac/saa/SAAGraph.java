@@ -8,16 +8,27 @@ import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 
-class SAAGraph {
+public class SAAGraph {
 	
   protected SAAArgument[] arguments;
   protected Map<String, SAAArgument> argumentMap;
   
   protected Map<String, SAAAttack> attackMap;
   
-  public SAAGraph(){
-		
-	}
+  protected double MAX_FIXPOINT_ERROR = 0.01; 
+  
+  public void computeOutcomes(){
+    double change = Double.MAX_VALUE;
+    while (change > MAX_FIXPOINT_ERROR) {
+      change = 0;
+      for (SAAArgument a : arguments) {
+        double oldValuation = a.getValuation();
+        a.updateValuation();
+        change += Math.abs(oldValuation - a.getValuation());
+      }
+      System.out.println(change);
+    }
+  }
   
   /**
    * This takes in a ResultSet and makes the following assumptions: 1) first
@@ -27,6 +38,7 @@ class SAAGraph {
   public void loadArgumentsFromResultSet(ResultSet rs) throws SQLException {
     List<SAAArgument> tmpArgs = new LinkedList<SAAArgument>();
     argumentMap = new HashMap<String, SAAArgument>();
+    attackMap = new HashMap<String, SAAAttack>();
     
     while (rs.next()) {
       SAAArgument a = new SAAArgument(rs.getString("source_ID"), rs.getInt("arg_ID"));
@@ -78,6 +90,13 @@ class SAAGraph {
       String argID = SAAArgument.makeGlobalID(rs.getString("source_ID"), rs.getInt("arg_ID"));
       SAAArgument arg = argumentMap.get(argID);
       arg.setVotes(rs.getInt("positive_votes"), rs.getInt("negative_votes"));
+    }
+  }
+  
+  
+  public void printGraph() {
+    for (SAAArgument a : arguments) {
+      System.out.println(a.getGlobalID() + " - " + a.getValuation());
     }
   }
 }
