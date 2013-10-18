@@ -1,21 +1,33 @@
 package org.agora.jac;
 
+import java.io.*;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.*;
 
+import org.agora.jac.logging.*;
 import org.agora.jac.saa.SAAArgument;
 import org.agora.jac.saa.SAAGraph;
+import org.json.simple.*;
+import org.json.simple.parser.*;
 
 
 
 public class JAgoraComputation {
 	
-	protected Connection c;
+	protected static final String DEFAULT_DATABASE_FILE = "databases.conf";
+  protected Connection c;
 	protected SAAGraph graph;
+	
+	protected List<DatabaseConnection> dbConnections;
+	
+	public JAgoraComputation() {
+	  dbConnections = new LinkedList<DatabaseConnection>();
+	}
 	
 	public boolean initiateConnection(String url, String user, String password) {
 	  try {
@@ -23,11 +35,11 @@ public class JAgoraComputation {
       c = DriverManager.getConnection(url, user, password);
       return true;
     } catch (ClassNotFoundException e) {
-      System.err.println("JAgoraComputation: unable to load com.mysql.jdbc.Driver.");
-      System.err.println(e.getMessage());
+      Log.error("JAgoraComputation: unable to load com.mysql.jdbc.Driver.");
+      Log.error(e.getMessage());
     } catch (SQLException e) {
-      System.err.println("JAgoraComputation: problem connecting to '" + url + "'");
-      System.err.println(e.getMessage());
+      Log.error("JAgoraComputation: problem connecting to '" + url + "'");
+      Log.error(e.getMessage());
     }
 	  return false;
 	}
@@ -37,8 +49,8 @@ public class JAgoraComputation {
       c.close();
       return true;
     } catch (SQLException e) {
-      System.err.println("JAgoraComputation: problems disconnecting database.");
-      System.err.println(e.getMessage());
+      Log.error("JAgoraComputation: problems disconnecting database.");
+      Log.error(e.getMessage());
     }
 	  return false;
 	}
@@ -72,8 +84,8 @@ public class JAgoraComputation {
 	    s.close();
 	    return true;
 	  } catch (SQLException e) {
-	    System.err.println("JAgoraComputation: problem retrieving graph.");
-      System.err.println(e.getMessage());
+	    Log.error("JAgoraComputation: problem retrieving graph.");
+	    Log.error(e.getMessage());
 	  }
     return false;
 	}
@@ -99,8 +111,8 @@ public class JAgoraComputation {
 	    c.close();
 	    return true;
 	  } catch (SQLException e){
-	    System.err.println("JAgoraComputation: problem storing outcomes.");
-      System.err.println(e.getMessage());
+	    Log.error("[ERROR] JAgoraComputation: problem storing outcomes.");
+      Log.error(e.getMessage());
       e.printStackTrace();
 	  }
 	  return false;
@@ -114,24 +126,55 @@ public class JAgoraComputation {
 	  graph.printGraph();
 	}
 	
+	public void run() {
+	  JAgoraComputation jac = new JAgoraComputation();
+    if (!jac.initiateConnection("jdbc:mysql://192.168.8.200:3306/agora-db", "agora-dev", "pythagoras"))
+      return;
+    if (!jac.loadDataFromDB()) return;
+    jac.printGraph();
+    Log.log("Starting computation... ", false);
+    jac.computeOutcomes();
+    Log.log("done!");
+    Log.log("Updating database... ");
+    if(jac.updateDatabase())
+      Log.log("done!");
+    else
+      Log.log("failed!");
+    System.out.println();
+    if (!jac.terminateConnection()) return;
+    jac.printGraph();
+	}
 	
+	public boolean loadDatabaseFile(String path) {
+	  try {
+	    JSONParser parser = new JSONParser();
+	    JSONArray dbs = (JSONArray) parser.parse(new FileReader(new File(path)));
+	    for (Object databaseInfo : dbs) {
+	      DatabaseConnection dbc = new DatabaseConnection();
+	      dbc.loadFromJSON((JSONObject)databaseInfo);
+	      dbConnections.add(dbc);
+	    }
+	    Log.log("[LOG] JAgoraComputation: Database file '"+path+"' loaded successfully.");
+	    return true;
+	  } catch (IOException e) {
+	    Log.error("[ERROR] JAgoraComputation: could not open databases file '" + path +"'.");
+	  } catch (ParseException e) {
+	    Log.error("[ERROR] JAgoraComputation: could not parse databases file '" + path +"'.");
+	    Log.error("[ERROR] " + e.getLocalizedMessage());
+	  } catch (ClassCastException e) {
+	    Log.error("[ERROR] JAgoraComputation: database file '" + path +"' was not in expected format.");
+	  }
+	  return false;
+	}
 	
 	public static void main(String[] args) throws Exception{
 		JAgoraComputation jac = new JAgoraComputation();
-		if (!jac.initiateConnection("jdbc:mysql://192.168.8.200:3306/agora-db", "agora-dev", "pythagoras"))
-		  return;
-		if (!jac.loadDataFromDB()) return;
-		jac.printGraph();
-		System.out.print("Starting computation... ");
-		jac.computeOutcomes();
-		System.out.println("done!");
-		System.out.print("Updating database... ");
-		if(jac.updateDatabase())
-		  System.out.println("done!");
-		else
-		  System.out.println("failed!");
-		System.out.println();
-		if (!jac.terminateConnection()) return;
-		jac.printGraph();
+		Log.addLog(new ConsoleLog());
+		jac.loadDatabaseFile(JAgoraComputation.DEFAULT_DATABASE_FILE);
 	}
 }
+
+
+
+
+
