@@ -10,6 +10,7 @@ JAVA_FILES := $(shell find $(SRC_DIR) -name '*.java')
 
 all: bindir
 	$(JC) $(JFLAGS) -d $(BIN_DIR) -cp $(CP) $(JAVA_FILES)
+	chmod a+x JAgoraComputation
 
 bindir:
 	mkdir -p $(BIN_DIR)
