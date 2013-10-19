@@ -1,0 +1,2 @@
+#!/bin/sh
+java -cp bin:lib/json-simple-1.1.1.jar:lib/mysql-connector-java-5.1.26-bin.jar org.agora.jac.JAgoraComputation
