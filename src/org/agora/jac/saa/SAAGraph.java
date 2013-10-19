@@ -8,6 +8,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 
+import org.agora.jac.Options;
+import org.agora.jac.logging.Log;
+
 public class SAAGraph {
 	
   protected SAAArgument[] arguments;
@@ -95,8 +98,11 @@ public class SAAGraph {
   public SAAArgument[] getArguments() { return arguments; }
   
   public void printGraph() {
+    if (!Options.DEBUG_MESSAGES)
+      return;
+    
     for (SAAArgument a : arguments) {
-      System.out.println(a.getGlobalID() + " - " + a.getValuation());
+      Log.debug(a.getGlobalID() + " - " + a.getValuation());
     }
   }
 }

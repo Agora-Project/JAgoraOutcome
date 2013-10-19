@@ -2,7 +2,6 @@ package org.agora.jac;
 
 import java.io.*;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -20,47 +19,19 @@ import org.json.simple.parser.*;
 public class JAgoraComputation {
 	
 	protected static final String DEFAULT_DATABASE_FILE = "databases.conf";
-  protected Connection c;
-	protected SAAGraph graph;
-	
+  
 	protected List<DatabaseConnection> dbConnections;
 	
 	public JAgoraComputation() {
 	  dbConnections = new LinkedList<DatabaseConnection>();
 	}
 	
-	public boolean initiateConnection(String url, String user, String password) {
-	  try {
-      Class.forName("com.mysql.jdbc.Driver");
-      c = DriverManager.getConnection(url, user, password);
-      return true;
-    } catch (ClassNotFoundException e) {
-      Log.error("JAgoraComputation: unable to load com.mysql.jdbc.Driver.");
-      Log.error(e.getMessage());
-    } catch (SQLException e) {
-      Log.error("JAgoraComputation: problem connecting to '" + url + "'");
-      Log.error(e.getMessage());
-    }
-	  return false;
-	}
-	
-	public boolean terminateConnection() {
-	  try {
-      c.close();
-      return true;
-    } catch (SQLException e) {
-      Log.error("JAgoraComputation: problems disconnecting database.");
-      Log.error(e.getMessage());
-    }
-	  return false;
-	}
-	
-	public boolean loadDataFromDB() {
-	  graph = new SAAGraph();
+	public SAAGraph loadDataFromDB(DatabaseConnection dbc) {
+	  SAAGraph graph = new SAAGraph();
 	  Statement s;
 	  ResultSet rs;
 	  try {
-	    s = c.createStatement();
+	    s = dbc.getConnection().createStatement();
 	    rs = s.executeQuery("SELECT source_ID, arg_ID FROM arguments;");
 	    graph.loadArgumentsFromResultSet(rs);
 	    rs = s.executeQuery("SELECT source_ID_attacker, arg_ID_attacker,"
@@ -82,17 +53,18 @@ public class JAgoraComputation {
                               +          " source_ID_defender, arg_ID_defender");
 	    graph.loadAttackVotesFromResultSet(rs);
 	    s.close();
-	    return true;
+	    return graph;
 	  } catch (SQLException e) {
 	    Log.error("JAgoraComputation: problem retrieving graph.");
 	    Log.error(e.getMessage());
 	  }
-    return false;
+    return null;
 	}
 	
 	
-	public boolean updateDatabase() {
+	public boolean updateDatabase(DatabaseConnection dbc, SAAGraph graph) {
 	  try {
+	    Connection c = dbc.getConnection();
 	    c.setAutoCommit(false);
 	    
 	    PreparedStatement s = c.prepareStatement("UPDATE arguments SET acceptability=? WHERE arg_ID=? AND source_ID=?;");
@@ -107,8 +79,8 @@ public class JAgoraComputation {
 	    s.executeBatch();
 	    
 	    c.commit();
+	    s.close();
 	    c.setAutoCommit(true);
-	    c.close();
 	    return true;
 	  } catch (SQLException e){
 	    Log.error("[ERROR] JAgoraComputation: problem storing outcomes.");
@@ -118,32 +90,43 @@ public class JAgoraComputation {
 	  return false;
 	}
 	
-	public void computeOutcomes() {
-	  graph.computeOutcomes();
-	}
-	
-	public void printGraph() {
-	  graph.printGraph();
-	}
-	
-	public void run() {
-	  JAgoraComputation jac = new JAgoraComputation();
-    if (!jac.initiateConnection("jdbc:mysql://192.168.8.200:3306/agora-db", "agora-dev", "pythagoras"))
-      return;
-    if (!jac.loadDataFromDB()) return;
-    jac.printGraph();
+	public boolean processDatabase(DatabaseConnection dbc) {
+    if (!dbc.initiateConnection())
+      return false;
+    
+    SAAGraph graph = loadDataFromDB(dbc);
+    if (graph == null)
+      return false;
+    
+    graph.printGraph();
+    
     Log.log("Starting computation... ", false);
-    jac.computeOutcomes();
+    graph.computeOutcomes();
     Log.log("done!");
-    Log.log("Updating database... ");
-    if(jac.updateDatabase())
-      Log.log("done!");
-    else
-      Log.log("failed!");
-    System.out.println();
-    if (!jac.terminateConnection()) return;
-    jac.printGraph();
+    
+    Log.log("Updating database... ", false);
+    if(updateDatabase(dbc, graph)) Log.log("done!");
+    else                           Log.log("failed!");
+    
+    if (!dbc.terminateConnection())
+      return false;
+    graph.printGraph();
+    return true;
 	}
+	
+	
+	public boolean processAllDatabases() {
+	  boolean allSuccessful = true;
+	  
+	  for (DatabaseConnection dbc : dbConnections) {
+	    Log.log("[LOG] Processing database '"+dbc.getUrl()+"'... ");
+	    boolean success = processDatabase(dbc);
+	    Log.log("[LOG] Processing database '"+dbc.getUrl()+"' was a " + ((success) ? "success!" : "failure!"));
+	    allSuccessful = allSuccessful && success;
+	  }
+	  return allSuccessful; 
+	}
+	
 	
 	public boolean loadDatabaseFile(String path) {
 	  try {
@@ -171,6 +154,7 @@ public class JAgoraComputation {
 		JAgoraComputation jac = new JAgoraComputation();
 		Log.addLog(new ConsoleLog());
 		jac.loadDatabaseFile(JAgoraComputation.DEFAULT_DATABASE_FILE);
+		jac.processAllDatabases();
 	}
 }
 
