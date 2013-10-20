@@ -1,7 +1,9 @@
 package org.agora.jac.logging;
 
-public class ConsoleLog extends StreamLog {
+import java.io.PrintWriter;
+
+public class ConsoleLog extends WriterLog {
   public ConsoleLog() {
-    super(System.out, System.err, System.out);
+    super(new PrintWriter(System.out), new PrintWriter(System.err), new PrintWriter(System.out));
   }
 }
